@@ -310,7 +310,8 @@ class QueueClient:
         if limit_remaining == 0 and limit_reset > 0:
             logger.debug(f"Rate limited: {request_log}")
             await self._close_ctx(limit_reset)
-            raise HandledError()
+            if not has_data(rep, res):
+                raise HandledError()
 
         # no way to check is account banned in direct way, but this check should work
         rate_limited = has_error(errors, "(88) Rate limit exceeded") and not has_data(rep, res)

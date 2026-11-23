@@ -413,6 +413,30 @@ async def test_rate_limit_locks_account_and_switches(client_fixture: CF):
 RATE_LIMIT_88 = {"errors": [{"code": 88, "message": "Rate limit exceeded"}]}
 
 
+@pytest.mark.parametrize("remaining", ["1", "0"])
+@pytest.mark.parametrize("with_rate_limit_error", [False, True])
+async def test_successful_data_preserved_at_quota_boundary(
+    client_fixture: CF, remaining: str, with_rate_limit_error: bool
+):
+    _, client, mock = client_fixture
+    body = {"data": {"user": {"id": "1"}}}
+    if with_rate_limit_error:
+        body = {**body, **RATE_LIMIT_88}
+
+    mock.add_response(
+        status_code=200,
+        json=body,
+        headers={"x-rate-limit-remaining": remaining, "x-rate-limit-reset": "9999999999"},
+    )
+    mock.add_response(json={"ok": True})  # a retry would discard the original data
+
+    async with client:
+        rep = await client.get(URL)
+        assert rep is not None
+        assert rep.json() == body
+        assert getattr(rep, "__username", None) == "user1"
+
+
 @pytest.mark.parametrize(
     "status, json, headers",
     [
